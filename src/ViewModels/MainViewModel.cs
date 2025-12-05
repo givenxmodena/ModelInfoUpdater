@@ -17,42 +17,86 @@ namespace ModelInfoUpdater.ViewModels
         private readonly IProjectInfoService _projectInfoService;
         private readonly Action _closeAction;
 
-        private string _projectName;
-        private string _projectNumber;
-        private string _clientName;
-        private string _projectStatus;
+        // Current (read-only) values from Revit
+        private string _currentProjectName;
+        private string _currentProjectNumber;
+        private string _currentClientName;
+        private string _currentProjectStatus;
+
+        // New (editable) values
+        private string _newProjectName;
+        private string _newProjectNumber;
+        private string _newClientName;
+        private string _newProjectStatus;
+
         private string _statusMessage;
         private bool _isStatusError;
 
-        #region Properties
+        #region Current Value Properties (Read-Only Display)
 
-        /// <summary>Gets or sets the project name.</summary>
-        public string ProjectName
+        /// <summary>Gets the current project name from Revit.</summary>
+        public string CurrentProjectName
         {
-            get => _projectName;
-            set => SetProperty(ref _projectName, value);
+            get => _currentProjectName;
+            private set => SetProperty(ref _currentProjectName, value);
         }
 
-        /// <summary>Gets or sets the project number.</summary>
-        public string ProjectNumber
+        /// <summary>Gets the current project number from Revit.</summary>
+        public string CurrentProjectNumber
         {
-            get => _projectNumber;
-            set => SetProperty(ref _projectNumber, value);
+            get => _currentProjectNumber;
+            private set => SetProperty(ref _currentProjectNumber, value);
         }
 
-        /// <summary>Gets or sets the client name.</summary>
-        public string ClientName
+        /// <summary>Gets the current client name from Revit.</summary>
+        public string CurrentClientName
         {
-            get => _clientName;
-            set => SetProperty(ref _clientName, value);
+            get => _currentClientName;
+            private set => SetProperty(ref _currentClientName, value);
         }
 
-        /// <summary>Gets or sets the project status.</summary>
-        public string ProjectStatus
+        /// <summary>Gets the current project status from Revit.</summary>
+        public string CurrentProjectStatus
         {
-            get => _projectStatus;
-            set => SetProperty(ref _projectStatus, value);
+            get => _currentProjectStatus;
+            private set => SetProperty(ref _currentProjectStatus, value);
         }
+
+        #endregion
+
+        #region New Value Properties (Editable)
+
+        /// <summary>Gets or sets the new project name.</summary>
+        public string NewProjectName
+        {
+            get => _newProjectName;
+            set => SetProperty(ref _newProjectName, value);
+        }
+
+        /// <summary>Gets or sets the new project number.</summary>
+        public string NewProjectNumber
+        {
+            get => _newProjectNumber;
+            set => SetProperty(ref _newProjectNumber, value);
+        }
+
+        /// <summary>Gets or sets the new client name.</summary>
+        public string NewClientName
+        {
+            get => _newClientName;
+            set => SetProperty(ref _newClientName, value);
+        }
+
+        /// <summary>Gets or sets the new project status.</summary>
+        public string NewProjectStatus
+        {
+            get => _newProjectStatus;
+            set => SetProperty(ref _newProjectStatus, value);
+        }
+
+        #endregion
+
+        #region Status Properties
 
         /// <summary>Gets or sets the status message displayed to user.</summary>
         public string StatusMessage
@@ -114,10 +158,18 @@ namespace ModelInfoUpdater.ViewModels
                 ProjectInfoModel model = _projectInfoService.LoadProjectInfo();
                 if (model != null)
                 {
-                    ProjectName = model.ProjectName;
-                    ProjectNumber = model.ProjectNumber;
-                    ClientName = model.ClientName;
-                    ProjectStatus = model.ProjectStatus;
+                    // Set current (read-only) values
+                    CurrentProjectName = model.ProjectName;
+                    CurrentProjectNumber = model.ProjectNumber;
+                    CurrentClientName = model.ClientName;
+                    CurrentProjectStatus = model.ProjectStatus;
+
+                    // Also populate new (editable) values with current values
+                    NewProjectName = model.ProjectName;
+                    NewProjectNumber = model.ProjectNumber;
+                    NewClientName = model.ClientName;
+                    NewProjectStatus = model.ProjectStatus;
+
                     SetStatus("Values loaded successfully.", false);
                 }
                 else
@@ -140,16 +192,23 @@ namespace ModelInfoUpdater.ViewModels
         {
             try
             {
+                // Use the new (editable) values for saving
                 var model = new ProjectInfoModel
                 {
-                    ProjectName = ProjectName,
-                    ProjectNumber = ProjectNumber,
-                    ClientName = ClientName,
-                    ProjectStatus = ProjectStatus
+                    ProjectName = NewProjectName,
+                    ProjectNumber = NewProjectNumber,
+                    ClientName = NewClientName,
+                    ProjectStatus = NewProjectStatus
                 };
 
                 if (_projectInfoService.SaveProjectInfo(model))
                 {
+                    // Update current values to reflect the saved changes
+                    CurrentProjectName = NewProjectName;
+                    CurrentProjectNumber = NewProjectNumber;
+                    CurrentClientName = NewClientName;
+                    CurrentProjectStatus = NewProjectStatus;
+
                     MessageBox.Show("Project information updated successfully!",
                         "Success", MessageBoxButton.OK, MessageBoxImage.Information);
                     _closeAction?.Invoke();

@@ -1,27 +1,50 @@
 <Window x:Class="ModelInfoUpdater.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Model Info Updater"
-        Height="380"
-        Width="450"
+        Title="Model Info Updater v1.1.0"
+        Height="520"
+        Width="500"
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#F5F5F5">
 
     <Window.Resources>
-        <!-- Style for Labels -->
-        <Style TargetType="Label">
+        <!-- Style for Field Labels -->
+        <Style x:Key="FieldLabelStyle" TargetType="Label">
             <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="Margin" Value="0,8,0,2"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+
+        <!-- Style for Current Value Labels -->
+        <Style x:Key="CurrentLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#666666"/>
             <Setter Property="Margin" Value="0,0,0,2"/>
+        </Style>
+
+        <!-- Style for Current Value Display -->
+        <Style x:Key="CurrentValueStyle" TargetType="TextBlock">
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Background" Value="#E9ECEF"/>
+            <Setter Property="Foreground" Value="#495057"/>
+            <Setter Property="FontStyle" Value="Italic"/>
+        </Style>
+
+        <!-- Style for New Value Labels -->
+        <Style x:Key="NewLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="#0078D4"/>
+            <Setter Property="Margin" Value="0,4,0,2"/>
         </Style>
 
         <!-- Style for TextBoxes -->
         <Style TargetType="TextBox">
             <Setter Property="Padding" Value="8,6"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
-            <Setter Property="BorderBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderBrush" Value="#0078D4"/>
             <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
         </Style>
 
         <!-- Style for Buttons -->
@@ -50,30 +73,44 @@
                    FontSize="18"
                    FontWeight="Bold"
                    Foreground="#1A1A1A"
-                   Margin="0,0,0,16"/>
+                   Margin="0,0,0,8"/>
 
-        <!-- Form Fields with Data Binding -->
-        <StackPanel Grid.Row="1">
-            <!-- Project Name -->
-            <Label Content="Project Name"/>
-            <TextBox Text="{Binding ProjectName, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Enter the project name"/>
+        <!-- Form Fields with Current and New Values -->
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Project Name -->
+                <Label Content="Project Name" Style="{StaticResource FieldLabelStyle}"/>
+                <TextBlock Text="Current:" Style="{StaticResource CurrentLabelStyle}"/>
+                <TextBlock Text="{Binding CurrentProjectName}" Style="{StaticResource CurrentValueStyle}"/>
+                <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
+                <TextBox Text="{Binding NewProjectName, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Enter the new project name"/>
 
-            <!-- Project Number -->
-            <Label Content="Project Number"/>
-            <TextBox Text="{Binding ProjectNumber, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Enter the project number"/>
+                <!-- Project Number -->
+                <Label Content="Project Number" Style="{StaticResource FieldLabelStyle}"/>
+                <TextBlock Text="Current:" Style="{StaticResource CurrentLabelStyle}"/>
+                <TextBlock Text="{Binding CurrentProjectNumber}" Style="{StaticResource CurrentValueStyle}"/>
+                <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
+                <TextBox Text="{Binding NewProjectNumber, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Enter the new project number"/>
 
-            <!-- Client Name -->
-            <Label Content="Client Name"/>
-            <TextBox Text="{Binding ClientName, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Enter the client name"/>
+                <!-- Client Name -->
+                <Label Content="Client Name" Style="{StaticResource FieldLabelStyle}"/>
+                <TextBlock Text="Current:" Style="{StaticResource CurrentLabelStyle}"/>
+                <TextBlock Text="{Binding CurrentClientName}" Style="{StaticResource CurrentValueStyle}"/>
+                <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
+                <TextBox Text="{Binding NewClientName, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Enter the new client name"/>
 
-            <!-- Project Status -->
-            <Label Content="Project Status"/>
-            <TextBox Text="{Binding ProjectStatus, UpdateSourceTrigger=PropertyChanged}"
-                     ToolTip="Enter the project status (e.g., In Progress, Complete, On Hold)"/>
-        </StackPanel>
+                <!-- Project Status -->
+                <Label Content="Project Status" Style="{StaticResource FieldLabelStyle}"/>
+                <TextBlock Text="Current:" Style="{StaticResource CurrentLabelStyle}"/>
+                <TextBlock Text="{Binding CurrentProjectStatus}" Style="{StaticResource CurrentValueStyle}"/>
+                <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
+                <TextBox Text="{Binding NewProjectStatus, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="Enter the new project status (e.g., In Progress, Complete, On Hold)"/>
+            </StackPanel>
+        </ScrollViewer>
 
         <!-- Status Message -->
         <TextBlock Grid.Row="2"
