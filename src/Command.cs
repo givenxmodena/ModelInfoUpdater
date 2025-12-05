@@ -52,6 +52,10 @@ namespace ModelInfoUpdater
 
                 Document doc = uiDoc.Document;
 
+                // Check for updates and notify user (non-blocking, runs in background)
+                // Fire-and-forget - we don't want to block the UI
+                _ = App.ShowUpdateNotificationIfAvailableAsync();
+
                 // Create the WPF window - dependency injection happens in MainWindow constructor
                 // MainWindow creates its ViewModel and Service internally
                 MainWindow mainWindow = new MainWindow(doc);

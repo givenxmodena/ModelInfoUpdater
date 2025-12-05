@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/velopack/velopack/master/src/Velopack.Build/velopack.schema.json",
+  "appId": "ModelInfoUpdater",
+  "title": "Model Info Updater",
+  "version": "1.0.0",
+  "authors": "Modena AEC",
+  "description": "Revit Add-in for viewing and editing Project Information parameters. Supports Revit 2024 (.NET 4.8) and Revit 2026 (.NET 8.0).",
+  "mainExe": "ModelInfoUpdater.Updater.exe",
+  "icon": null,
+  "channel": "stable",
+  "runtime": "net8.0-x64-desktop",
+  "packDirectory": "./build-output/net8.0-windows",
+  "outputDirectory": "./releases/velopack",
+  "releaseNotes": "Initial release with MVVM architecture, Velopack auto-updates, and support for Revit 2024/2026"
+}
+

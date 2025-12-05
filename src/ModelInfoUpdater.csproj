@@ -9,11 +9,12 @@
     <RootNamespace>ModelInfoUpdater</RootNamespace>
     <AssemblyName>ModelInfoUpdater</AssemblyName>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+
     <!-- Output to build-output folder -->
     <OutputPath>..\build-output\$(TargetFramework)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    
+
     <!-- Revit Add-in specific settings -->
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
@@ -58,6 +59,9 @@
     <Reference Include="PresentationFramework" />
     <Reference Include="WindowsBase" />
     <Reference Include="System.Xaml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
 
 </Project>
