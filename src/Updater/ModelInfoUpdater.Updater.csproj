@@ -25,5 +25,12 @@
     <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
 
+  <!-- Include the .addin template file in the output -->
+  <ItemGroup>
+    <None Update="ModelInfoUpdater.addin.template">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
 

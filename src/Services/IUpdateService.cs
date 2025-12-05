@@ -30,6 +30,16 @@ namespace ModelInfoUpdater.Services
         string CurrentVersion { get; }
 
         /// <summary>
+        /// Gets the last error message if update check failed.
+        /// </summary>
+        string? LastError { get; }
+
+        /// <summary>
+        /// Gets whether the Launcher is installed (Velopack installation exists).
+        /// </summary>
+        bool IsLauncherInstalled { get; }
+
+        /// <summary>
         /// Checks for available updates asynchronously.
         /// </summary>
         /// <returns>True if an update is available, false otherwise.</returns>

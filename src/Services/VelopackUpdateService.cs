@@ -17,6 +17,9 @@ namespace ModelInfoUpdater.Services
     /// - Launches a separate Updater.exe that waits for Revit to close
     /// - Updater.exe applies the update after Revit closes
     /// - New version is loaded on next Revit startup
+    ///
+    /// NOTE: Repository must be PUBLIC for unauthenticated access to releases.
+    /// For private repos, a GitHub Personal Access Token must be provided.
     /// </summary>
     public class VelopackUpdateService : IUpdateService
     {
@@ -24,11 +27,12 @@ namespace ModelInfoUpdater.Services
         private UpdateInfo? _updateInfo;
         private readonly string _githubRepoUrl;
         private bool _updateDownloaded;
+        private string? _lastError;
 
         /// <summary>
         /// Gets whether an update is currently available.
         /// </summary>
-        public bool IsUpdateAvailable => _updateInfo?.TargetFullRelease != null;
+        public bool IsUpdateAvailable => _updateInfo?.TargetFullRelease != null || _availableVersionFromHttp != null;
 
         /// <summary>
         /// Gets whether the update has been downloaded and is ready to apply.
@@ -38,33 +42,52 @@ namespace ModelInfoUpdater.Services
         /// <summary>
         /// Gets the version of the available update, if any.
         /// </summary>
-        public string? AvailableVersion => _updateInfo?.TargetFullRelease?.Version?.ToString();
+        public string? AvailableVersion => _updateInfo?.TargetFullRelease?.Version?.ToString() ?? _availableVersionFromHttp;
 
         /// <summary>
-        /// Gets the current installed version.
+        /// Gets the current installed version (from assembly, since add-in is manually installed).
         /// </summary>
-        public string CurrentVersion => _updateManager?.CurrentVersion?.ToString() ?? GetAssemblyVersion();
+        public string CurrentVersion => GetAssemblyVersion();
+
+        /// <summary>
+        /// Gets the last error message if update check failed.
+        /// </summary>
+        public string? LastError => _lastError;
+
+        /// <summary>
+        /// Gets the URL for downloading the latest release.
+        /// </summary>
+        public string DownloadUrl => $"{_githubRepoUrl}/releases/latest";
 
         /// <summary>
         /// Initializes a new instance of the VelopackUpdateService.
         /// </summary>
         /// <param name="githubRepoUrl">GitHub repository URL (e.g., "https://github.com/owner/repo")</param>
-        public VelopackUpdateService(string githubRepoUrl)
+        /// <param name="accessToken">Optional GitHub Personal Access Token for private repos.</param>
+        public VelopackUpdateService(string githubRepoUrl, string? accessToken = null)
         {
             _githubRepoUrl = githubRepoUrl;
             _updateDownloaded = false;
+            _lastError = null;
 
             try
             {
                 // Use GitHub as the update source - Velopack will look for releases
-                var source = new GithubSource(_githubRepoUrl, null, false);
+                // For private repos, an access token is required
+                var source = new GithubSource(_githubRepoUrl, accessToken, prerelease: false);
                 _updateManager = new UpdateManager(source);
+                LogDebug($"UpdateManager initialized. Current version (assembly): {CurrentVersion}");
+
+                // Note: For manually-installed Revit add-ins, Velopack can only CHECK for updates.
+                // The UpdateManager.CurrentVersion will be null since the app wasn't installed via Velopack.
+                // We use the assembly version instead and compare it against available releases.
             }
             catch (Exception ex)
             {
                 // If Velopack isn't properly installed (e.g., running in debug),
                 // the UpdateManager may fail. We handle this gracefully.
-                System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] Init failed: {ex.Message}");
+                _lastError = $"Init failed: {ex.Message}";
+                LogDebug($"[VelopackUpdateService] {_lastError}");
                 _updateManager = null;
             }
         }
@@ -81,25 +104,161 @@ namespace ModelInfoUpdater.Services
             }
         }
 
+        private static void LogDebug(string message)
+        {
+            System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] {message}");
+        }
+
         /// <summary>
         /// Checks for available updates asynchronously.
+        /// For manually-installed Revit add-ins, this compares assembly version against GitHub releases.
         /// </summary>
         /// <returns>True if an update is available, false otherwise.</returns>
         public async Task<bool> CheckForUpdatesAsync()
         {
-            if (_updateManager == null)
-                return false;
-
             try
             {
-                _updateInfo = await _updateManager.CheckForUpdatesAsync();
-                return IsUpdateAvailable;
+                LogDebug($"Checking for updates at: {_githubRepoUrl}");
+                LogDebug($"Current version (assembly): {CurrentVersion}");
+
+                // Try Velopack's built-in check first (works if app was installed via Velopack)
+                if (_updateManager != null)
+                {
+                    try
+                    {
+                        _updateInfo = await _updateManager.CheckForUpdatesAsync();
+
+                        if (_updateInfo?.TargetFullRelease != null)
+                        {
+                            var latestVersion = _updateInfo.TargetFullRelease.Version.ToString();
+                            LogDebug($"Velopack found update: {latestVersion}");
+
+                            // Manual version comparison since Velopack may not know our current version
+                            if (IsNewerVersion(latestVersion, CurrentVersion))
+                            {
+                                LogDebug($"Update available: {latestVersion} > {CurrentVersion}");
+                                _lastError = null;
+                                return true;
+                            }
+                            else
+                            {
+                                LogDebug($"Already on latest version: {CurrentVersion} >= {latestVersion}");
+                                _lastError = null;
+                                return false;
+                            }
+                        }
+                    }
+                    catch (Exception veloEx)
+                    {
+                        LogDebug($"Velopack check failed: {veloEx.Message}");
+                        // Fall through to HTTP-based check
+                    }
+                }
+
+                // Fallback: HTTP-based version check using GitHub API
+                LogDebug("Falling back to HTTP-based version check...");
+                return await CheckForUpdatesViaHttpAsync();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Network error, invalid feed, etc.
+                _lastError = $"Update check failed: {ex.Message}";
+                LogDebug(_lastError);
                 _updateInfo = null;
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Checks for updates by directly querying GitHub releases API.
+        /// This works even when Velopack isn't installed.
+        /// </summary>
+        private async Task<bool> CheckForUpdatesViaHttpAsync()
+        {
+            try
+            {
+                // Extract owner/repo from URL
+                var uri = new Uri(_githubRepoUrl);
+                var pathParts = uri.AbsolutePath.Trim('/').Split('/');
+                if (pathParts.Length < 2)
+                {
+                    _lastError = "Invalid GitHub URL format";
+                    return false;
+                }
+
+                var apiUrl = $"https://api.github.com/repos/{pathParts[0]}/{pathParts[1]}/releases/latest";
+                LogDebug($"Fetching: {apiUrl}");
+
+                string response;
+#if NET8_0_OR_GREATER
+                using var httpClient = new System.Net.Http.HttpClient();
+                httpClient.DefaultRequestHeaders.Add("User-Agent", "ModelInfoUpdater");
+                response = await httpClient.GetStringAsync(apiUrl);
+#else
+                // Use WebClient for .NET Framework
+                using (var webClient = new System.Net.WebClient())
+                {
+                    webClient.Headers.Add("User-Agent", "ModelInfoUpdater");
+                    response = await Task.Run(() => webClient.DownloadString(apiUrl));
+                }
+#endif
+
+                // Simple JSON parsing for tag_name
+                var tagMatch = System.Text.RegularExpressions.Regex.Match(response, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                if (tagMatch.Success)
+                {
+                    var latestTag = tagMatch.Groups[1].Value;
+                    var latestVersion = latestTag.TrimStart('v', 'V');
+                    _availableVersionFromHttp = latestVersion;
+
+                    LogDebug($"Latest release tag: {latestTag} (version: {latestVersion})");
+
+                    if (IsNewerVersion(latestVersion, CurrentVersion))
+                    {
+                        LogDebug($"Update available via HTTP check: {latestVersion} > {CurrentVersion}");
+                        _lastError = null;
+                        return true;
+                    }
+                    else
+                    {
+                        LogDebug($"Already on latest version: {CurrentVersion} >= {latestVersion}");
+                        _lastError = null;
+                        return false;
+                    }
+                }
+
+                _lastError = "Could not parse GitHub release response";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                _lastError = $"HTTP update check failed: {ex.Message}";
+                LogDebug(_lastError);
+                return false;
+            }
+        }
+
+        private string? _availableVersionFromHttp;
+
+        /// <summary>
+        /// Compares two version strings. Returns true if newVersion is greater than currentVersion.
+        /// </summary>
+        private static bool IsNewerVersion(string newVersion, string currentVersion)
+        {
+            try
+            {
+                // Clean up versions
+                newVersion = newVersion.TrimStart('v', 'V');
+                currentVersion = currentVersion.TrimStart('v', 'V');
+
+                var newVer = new Version(newVersion);
+                var curVer = new Version(currentVersion);
+
+                return newVer > curVer;
+            }
+            catch
+            {
+                // If parsing fails, do string comparison
+                return string.Compare(newVersion, currentVersion, StringComparison.OrdinalIgnoreCase) > 0;
             }
         }
 
@@ -131,49 +290,89 @@ namespace ModelInfoUpdater.Services
         }
 
         /// <summary>
-        /// Launches the updater executable to apply the update after Revit closes.
-        /// This is the recommended way to apply updates for Revit add-ins.
+        /// Finds the Launcher executable. Velopack installs it to %LocalAppData%\ModelInfoUpdater\
+        /// </summary>
+        private static string? FindLauncherPath()
+        {
+            // Primary location: Velopack install directory
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string velopackDir = Path.Combine(localAppData, "ModelInfoUpdater");
+
+            // Velopack creates current\ symlink or we check app-* folders
+            string currentDir = Path.Combine(velopackDir, "current");
+            if (Directory.Exists(currentDir))
+            {
+                string launcherPath = Path.Combine(currentDir, "ModelInfoUpdater.Updater.exe");
+                if (File.Exists(launcherPath))
+                    return launcherPath;
+            }
+
+            // Fallback: Find latest app-* folder
+            if (Directory.Exists(velopackDir))
+            {
+                var appDirs = Directory.GetDirectories(velopackDir, "app-*");
+                foreach (var dir in appDirs.OrderByDescending(d => d))
+                {
+                    string launcherPath = Path.Combine(dir, "ModelInfoUpdater.Updater.exe");
+                    if (File.Exists(launcherPath))
+                        return launcherPath;
+                }
+            }
+
+            // Fallback: Next to add-in DLL (for development/manual install)
+            string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+            string localLauncher = Path.Combine(assemblyDir, "ModelInfoUpdater.Updater.exe");
+            if (File.Exists(localLauncher))
+                return localLauncher;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Gets whether the Launcher is installed (Velopack installation exists).
+        /// </summary>
+        public bool IsLauncherInstalled => FindLauncherPath() != null;
+
+        /// <summary>
+        /// Launches the updater executable to check for and apply updates.
+        /// The Launcher downloads the update, then deploys files to Revit add-in folder.
         /// </summary>
         /// <param name="silent">If true, updater runs without console output.</param>
-        /// <returns>True if updater was launched successfully.</returns>
-        public bool LaunchUpdater(bool silent = true)
+        /// <returns>True if launcher was started successfully.</returns>
+        public bool LaunchUpdater(bool silent = false)
         {
             try
             {
-                // Find the updater executable next to our DLL
-                string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string updaterPath = Path.Combine(assemblyDir, "ModelInfoUpdater.Updater.exe");
+                string? launcherPath = FindLauncherPath();
 
-                if (!File.Exists(updaterPath))
+                if (launcherPath == null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] Updater not found at: {updaterPath}");
+                    _lastError = "Launcher not found. Please run the installer first.";
+                    LogDebug(_lastError);
                     return false;
                 }
 
-                // Get current Revit process ID so updater knows what to wait for
-                int revitPid = Process.GetCurrentProcess().Id;
-
                 // Build arguments
-                string args = $"--wait-pid={revitPid}";
+                string args = "--update";
                 if (silent) args += " --silent";
 
                 // Launch the updater
                 var startInfo = new ProcessStartInfo
                 {
-                    FileName = updaterPath,
+                    FileName = launcherPath,
                     Arguments = args,
-                    UseShellExecute = false,
-                    CreateNoWindow = silent,
+                    UseShellExecute = true, // Show console window
                     WindowStyle = silent ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Normal
                 };
 
                 Process.Start(startInfo);
-                System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] Launched updater: {updaterPath} {args}");
+                LogDebug($"Launched updater: {launcherPath} {args}");
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] Failed to launch updater: {ex.Message}");
+                _lastError = $"Failed to launch updater: {ex.Message}";
+                LogDebug(_lastError);
                 return false;
             }
         }

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>Model Info Updater</Name>
+    <Assembly>{APPDIR}\ModelInfoUpdater.dll</Assembly>
+    <AddInId>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</AddInId>
+    <FullClassName>ModelInfoUpdater.App</FullClassName>
+    <VendorId>MDNA</VendorId>
+    <VendorDescription>Modena AEC</VendorDescription>
+  </AddIn>
+  <AddIn Type="Command">
+    <Name>Model Info Updater</Name>
+    <Assembly>{APPDIR}\ModelInfoUpdater.dll</Assembly>
+    <AddInId>B2C3D4E5-F6A7-8901-BCDE-F12345678901</AddInId>
+    <FullClassName>ModelInfoUpdater.Command</FullClassName>
+    <VendorId>MDNA</VendorId>
+    <VendorDescription>Modena AEC</VendorDescription>
+  </AddIn>
+</RevitAddIns>
+

@@ -108,7 +108,11 @@ namespace ModelInfoUpdater
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] Initializing update service for: {GitHubRepoUrl}");
+
                 UpdateService = new VelopackUpdateService(GitHubRepoUrl);
+
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] Current version: {UpdateService.CurrentVersion}");
 
                 // Check for updates in the background
                 bool updateAvailable = await UpdateService.CheckForUpdatesAsync();
@@ -117,6 +121,18 @@ namespace ModelInfoUpdater
                 {
                     System.Diagnostics.Debug.WriteLine(
                         $"[ModelInfoUpdater] Update available: v{UpdateService.AvailableVersion}");
+                }
+                else
+                {
+                    var lastError = (UpdateService as VelopackUpdateService)?.LastError;
+                    if (!string.IsNullOrEmpty(lastError))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] Update check issue: {lastError}");
+                    }
+                    else
+                    {
+                        System.Diagnostics.Debug.WriteLine("[ModelInfoUpdater] No updates available - already on latest version.");
+                    }
                 }
             }
             catch (Exception ex)
@@ -131,59 +147,91 @@ namespace ModelInfoUpdater
         /// Shows an update notification dialog if an update is available.
         /// Called from Command.Execute() to notify user at appropriate time.
         /// </summary>
-        /// <returns>True if user chose to download/apply update, false otherwise.</returns>
+        /// <returns>True if user chose to apply update, false otherwise.</returns>
         public static async Task<bool> ShowUpdateNotificationIfAvailableAsync()
         {
+            // Debug: Show update check status
+            System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] ShowUpdateNotificationIfAvailableAsync called");
+            System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] UpdateService: {(UpdateService == null ? "null" : "initialized")}");
+
+            if (UpdateService != null)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] IsUpdateAvailable: {UpdateService.IsUpdateAvailable}");
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] CurrentVersion: {UpdateService.CurrentVersion}");
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] AvailableVersion: {UpdateService.AvailableVersion ?? "none"}");
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] LastError: {UpdateService.LastError ?? "none"}");
+                System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] IsLauncherInstalled: {UpdateService.IsLauncherInstalled}");
+            }
+
+            System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] _updateNotificationShown: {_updateNotificationShown}");
+
             if (UpdateService == null || !UpdateService.IsUpdateAvailable || _updateNotificationShown)
                 return false;
 
             _updateNotificationShown = true;
 
-            var dialog = new TaskDialog("Update Available")
+            // Check if Launcher is installed (Velopack installation)
+            if (UpdateService.IsLauncherInstalled)
             {
-                MainInstruction = $"A new version is available!",
-                MainContent = $"Current version: {UpdateService.CurrentVersion}\n" +
-                              $"New version: {UpdateService.AvailableVersion}\n\n" +
-                              "Would you like to download the update?\n" +
-                              "The update will be applied after you close Revit.",
-                CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
-                DefaultButton = TaskDialogResult.Yes
-            };
-
-            var result = dialog.Show();
-
-            if (result == TaskDialogResult.Yes)
-            {
-                // Show progress dialog
-                var progressDialog = new TaskDialog("Downloading Update")
+                // Launcher found - use automatic update flow
+                var dialog = new TaskDialog("Update Available")
                 {
-                    MainInstruction = "Downloading update...",
-                    MainContent = "Please wait while the update is being downloaded.",
-                    CommonButtons = TaskDialogCommonButtons.None
+                    MainInstruction = $"A new version is available!",
+                    MainContent = $"Current version: {UpdateService.CurrentVersion}\n" +
+                                  $"New version: {UpdateService.AvailableVersion}\n\n" +
+                                  "Would you like to update now?\n\n" +
+                                  "Note: Close Revit after the update completes to apply changes.",
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                    DefaultButton = TaskDialogResult.Yes
                 };
 
-                // Download in background
-                bool downloaded = await UpdateService.DownloadUpdateAsync(progress =>
+                if (dialog.Show() == TaskDialogResult.Yes)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] Download progress: {progress}%");
-                });
-
-                if (downloaded)
-                {
-                    // Launch the updater to apply after Revit closes
-                    UpdateService.LaunchUpdater(silent: true);
-
-                    TaskDialog.Show("Update Ready",
-                        "The update has been downloaded and will be applied when you close Revit.\n\n" +
-                        "Your work will not be affected. Simply close Revit when ready, " +
-                        "and the update will be installed automatically.");
-                    return true;
+                    // Launch the updater with --update flag
+                    if (UpdateService.LaunchUpdater(silent: false))
+                    {
+                        TaskDialog.Show("Update Started",
+                            "The updater is running. Please close Revit when prompted to complete the update.");
+                        return true;
+                    }
+                    else
+                    {
+                        TaskDialog.Show("Error",
+                            UpdateService.LastError ?? "Failed to start the updater.");
+                    }
                 }
-                else
+            }
+            else
+            {
+                // No Launcher - direct user to download page
+                var dialog = new TaskDialog("Update Available")
                 {
-                    TaskDialog.Show("Download Failed",
-                        "Failed to download the update. Please try again later or " +
-                        "download manually from GitHub.");
+                    MainInstruction = $"A new version is available!",
+                    MainContent = $"Current version: {UpdateService.CurrentVersion}\n" +
+                                  $"New version: {UpdateService.AvailableVersion}\n\n" +
+                                  "Would you like to open the download page?",
+                    CommonButtons = TaskDialogCommonButtons.Yes | TaskDialogCommonButtons.No,
+                    DefaultButton = TaskDialogResult.Yes
+                };
+
+                if (dialog.Show() == TaskDialogResult.Yes)
+                {
+                    try
+                    {
+                        var downloadUrl = $"{GitHubRepoUrl}/releases/latest";
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = downloadUrl,
+                            UseShellExecute = true
+                        });
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[ModelInfoUpdater] Failed to open browser: {ex.Message}");
+                        TaskDialog.Show("Error",
+                            $"Could not open browser. Please visit:\n{GitHubRepoUrl}/releases/latest");
+                    }
                 }
             }
 
