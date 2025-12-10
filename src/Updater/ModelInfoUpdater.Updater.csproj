@@ -1,29 +1,37 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
-    <UseWPF>false</UseWPF>
-    <UseWindowsForms>false</UseWindowsForms>
-    <LangVersion>latest</LangVersion>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <RootNamespace>ModelInfoUpdater.Updater</RootNamespace>
-    <AssemblyName>ModelInfoUpdater.Updater</AssemblyName>
-    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
-    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+	<PropertyGroup>
+	  <!-- WPF WinExe so we get a normal window instead of a console host -->
+	  <OutputType>WinExe</OutputType>
+	  <TargetFramework>net8.0-windows</TargetFramework>
+	  <UseWPF>true</UseWPF>
+	  <UseWindowsForms>false</UseWindowsForms>
+	  <LangVersion>latest</LangVersion>
+	  <Nullable>enable</Nullable>
+	  <ImplicitUsings>disable</ImplicitUsings>
+	  <RootNamespace>ModelInfoUpdater.Updater</RootNamespace>
+	  <AssemblyName>ModelInfoUpdater.Updater</AssemblyName>
+	  <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+	  <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
 
-    <!-- Output to build-output folder alongside the add-in -->
-    <OutputPath>..\..\build-output\net8.0-windows\</OutputPath>
-    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+	  <!-- Output to build-output folder alongside the add-in -->
+	  <OutputPath>..\..\build-output\net8.0-windows\</OutputPath>
+	  <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
 
-    <!-- Hide console window when running -->
-    <ApplicationManifest>app.manifest</ApplicationManifest>
-  </PropertyGroup>
+	  <!-- Still use the existing manifest (requestedExecutionLevel, etc). No console is created for WinExe. -->
+	  <ApplicationManifest>app.manifest</ApplicationManifest>
+	</PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Velopack" Version="0.0.1298" />
   </ItemGroup>
+
+	  <!-- Shared helpers used by add-in and updater -->
+	  <ItemGroup>
+	    <Compile Include="..\Logging\FileLogger.cs" Link="Logging\FileLogger.cs" />
+	    <Compile Include="..\Core\ViewModelBase.cs" Link="Core\ViewModelBase.cs" />
+	    <Compile Include="..\Core\RelayCommand.cs" Link="Core\RelayCommand.cs" />
+	  </ItemGroup>
 
   <!-- Include the .addin template file in the output -->
   <ItemGroup>
@@ -31,6 +39,63 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!--
+    After build, copy framework-specific add-in files into subfolders
+    so Velopack package includes both frameworks for multi-targeting deployment.
+
+    Folder structure for deployment:
+    - build-output/net8.0-windows/           (Velopack package root)
+      - net48/ModelInfoUpdater.dll           (for Revit 2024/2025)
+      - net8.0-windows/ModelInfoUpdater.dll  (for Revit 2026)
+      - net8.0-windows/ModelInfoUpdater.deps.json
+      - ModelInfoUpdater.Updater.exe         (Launcher)
+      - ...
+
+    Note: net48 doesn't need Velopack.dll because Revit add-ins don't do update checking -
+    the Launcher handles that. The Revit add-in just needs ModelInfoUpdater.dll.
+  -->
+  <Target Name="CopyFrameworkFiles" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <!-- Source directories for each framework's add-in build -->
+      <Net48SourceDir>$(MSBuildProjectDirectory)\..\..\build-output\net48\</Net48SourceDir>
+      <Net8SourceDir>$(MSBuildProjectDirectory)\..\..\build-output\net8.0-windows\</Net8SourceDir>
+
+      <!-- Destination subfolders within the Updater output -->
+      <Net48DestDir>$(OutputPath)net48\</Net48DestDir>
+      <Net8DestDir>$(OutputPath)net8.0-windows\</Net8DestDir>
+    </PropertyGroup>
+
+    <!-- Create destination directories -->
+    <MakeDir Directories="$(Net48DestDir)" Condition="Exists('$(Net48SourceDir)')" />
+    <MakeDir Directories="$(Net8DestDir)" Condition="Exists('$(Net8SourceDir)')" />
+
+    <!-- Files to copy for .NET Framework 4.8 (Revit 2024/2025) -->
+    <ItemGroup>
+      <Net48FilesToCopy Include="$(Net48SourceDir)ModelInfoUpdater.dll" />
+    </ItemGroup>
+
+    <!-- Files to copy for .NET 8.0 (Revit 2026) -->
+    <ItemGroup>
+      <Net8FilesToCopy Include="$(Net8SourceDir)ModelInfoUpdater.dll" />
+      <Net8FilesToCopy Include="$(Net8SourceDir)ModelInfoUpdater.deps.json" />
+    </ItemGroup>
+
+    <!-- Copy .NET Framework 4.8 files -->
+    <Copy SourceFiles="@(Net48FilesToCopy)"
+          DestinationFolder="$(Net48DestDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(Net48SourceDir)')" />
+
+    <!-- Copy .NET 8.0 files -->
+    <Copy SourceFiles="@(Net8FilesToCopy)"
+          DestinationFolder="$(Net8DestDir)"
+          SkipUnchangedFiles="true"
+          Condition="Exists('$(Net8SourceDir)')" />
+
+    <Message Importance="high" Text="Copied .NET Framework 4.8 files to $(Net48DestDir)" Condition="Exists('$(Net48SourceDir)')" />
+    <Message Importance="high" Text="Copied .NET 8.0 files to $(Net8DestDir)" Condition="Exists('$(Net8SourceDir)')" />
+  </Target>
 
 </Project>
 

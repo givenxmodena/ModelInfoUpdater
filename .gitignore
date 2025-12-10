@@ -104,3 +104,31 @@ nCrunchTemp_*
 # Publish folder
 PublishOutput/
 
+# ===========================================
+# SECURITY: Token and credential files
+# ===========================================
+# GitHub tokens (encrypted or plain)
+.github-token*
+*.github-token
+github-token*
+
+# Environment files that may contain secrets
+.env
+.env.local
+.env.*.local
+*.env
+
+# Encrypted credential files
+*.enc
+*.encrypted
+
+# Secret/credential files
+*secret*
+*credential*
+!**/CredentialCache*
+*.pem
+*.key
+
+# PowerShell secure string exports
+*.securestring
+

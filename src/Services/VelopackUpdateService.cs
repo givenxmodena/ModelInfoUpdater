@@ -3,8 +3,10 @@ using System.Diagnostics;
 using System.IO;
 using System.Reflection;
 using System.Threading.Tasks;
+using System.Linq;
 using Velopack;
 using Velopack.Sources;
+using ModelInfoUpdater.Logging;
 
 namespace ModelInfoUpdater.Services
 {
@@ -76,7 +78,7 @@ namespace ModelInfoUpdater.Services
                 // For private repos, an access token is required
                 var source = new GithubSource(_githubRepoUrl, accessToken, prerelease: false);
                 _updateManager = new UpdateManager(source);
-                LogDebug($"UpdateManager initialized. Current version (assembly): {CurrentVersion}");
+	                LogDebug($"UpdateManager initialized. Current version (assembly): {CurrentVersion}");
 
                 // Note: For manually-installed Revit add-ins, Velopack can only CHECK for updates.
                 // The UpdateManager.CurrentVersion will be null since the app wasn't installed via Velopack.
@@ -86,8 +88,8 @@ namespace ModelInfoUpdater.Services
             {
                 // If Velopack isn't properly installed (e.g., running in debug),
                 // the UpdateManager may fail. We handle this gracefully.
-                _lastError = $"Init failed: {ex.Message}";
-                LogDebug($"[VelopackUpdateService] {_lastError}");
+	                _lastError = $"Init failed: {ex.Message}";
+	                FileLogger.LogException("VelopackUpdateService", "Constructor", ex);
                 _updateManager = null;
             }
         }
@@ -104,10 +106,10 @@ namespace ModelInfoUpdater.Services
             }
         }
 
-        private static void LogDebug(string message)
-        {
-            System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] {message}");
-        }
+	        private static void LogDebug(string message)
+	        {
+	            FileLogger.Log(LogLevel.Debug, "VelopackUpdateService", message);
+	        }
 
         /// <summary>
         /// Checks for available updates asynchronously.
@@ -150,7 +152,8 @@ namespace ModelInfoUpdater.Services
                     }
                     catch (Exception veloEx)
                     {
-                        LogDebug($"Velopack check failed: {veloEx.Message}");
+	                        _lastError = $"Velopack check failed: {veloEx.Message}";
+	                        FileLogger.LogException("VelopackUpdateService", "CheckForUpdatesAsync_Velopack", veloEx);
                         // Fall through to HTTP-based check
                     }
                 }
@@ -162,7 +165,7 @@ namespace ModelInfoUpdater.Services
             catch (Exception ex)
             {
                 _lastError = $"Update check failed: {ex.Message}";
-                LogDebug(_lastError);
+	                FileLogger.LogException("VelopackUpdateService", "CheckForUpdatesAsync", ex);
                 _updateInfo = null;
                 return false;
             }
@@ -232,7 +235,7 @@ namespace ModelInfoUpdater.Services
             catch (Exception ex)
             {
                 _lastError = $"HTTP update check failed: {ex.Message}";
-                LogDebug(_lastError);
+	                FileLogger.LogException("VelopackUpdateService", "CheckForUpdatesViaHttpAsync", ex);
                 return false;
             }
         }
@@ -283,49 +286,113 @@ namespace ModelInfoUpdater.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[VelopackUpdateService] Download failed: {ex.Message}");
+	                FileLogger.LogException("VelopackUpdateService", "DownloadUpdateAsync", ex);
                 _updateDownloaded = false;
                 return false;
             }
         }
 
         /// <summary>
-        /// Finds the Launcher executable. Velopack installs it to %LocalAppData%\ModelInfoUpdater\
+        /// Finds the Launcher executable.
+        /// Search order:
+        ///  1. Velopack install directory under %LocalAppData%\ModelInfoUpdater
+        ///  2. Revit add-ins folders under %AppData%\Autodesk\Revit\Addins\<year>
+        ///  3. Next to the executing assembly (development/manual install)
         /// </summary>
         private static string? FindLauncherPath()
         {
-            // Primary location: Velopack install directory
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-            string velopackDir = Path.Combine(localAppData, "ModelInfoUpdater");
+	            // 1. Primary location: Velopack install directory
+	            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+	            string velopackDir = Path.Combine(localAppData, "ModelInfoUpdater");
+	            LogDebug($"Searching for launcher. LocalAppData='{localAppData}', VelopackDir='{velopackDir}'");
 
-            // Velopack creates current\ symlink or we check app-* folders
-            string currentDir = Path.Combine(velopackDir, "current");
-            if (Directory.Exists(currentDir))
-            {
-                string launcherPath = Path.Combine(currentDir, "ModelInfoUpdater.Updater.exe");
-                if (File.Exists(launcherPath))
-                    return launcherPath;
-            }
+	            // Velopack creates current\ symlink or we check app-* folders
+	            string currentDir = Path.Combine(velopackDir, "current");
+	            if (Directory.Exists(currentDir))
+	            {
+	                string launcherPath = Path.Combine(currentDir, "ModelInfoUpdater.Updater.exe");
+	                if (File.Exists(launcherPath))
+	                {
+	                    LogDebug($"Launcher found in Velopack 'current' directory: {launcherPath}");
+	                    return launcherPath;
+	                }
+	                else
+	                {
+	                    LogDebug($"No launcher in Velopack 'current' directory: {currentDir}");
+	                }
+	            }
+	            else
+	            {
+	                LogDebug($"Velopack 'current' directory does not exist: {currentDir}");
+	            }
 
-            // Fallback: Find latest app-* folder
-            if (Directory.Exists(velopackDir))
-            {
-                var appDirs = Directory.GetDirectories(velopackDir, "app-*");
-                foreach (var dir in appDirs.OrderByDescending(d => d))
-                {
-                    string launcherPath = Path.Combine(dir, "ModelInfoUpdater.Updater.exe");
-                    if (File.Exists(launcherPath))
-                        return launcherPath;
-                }
-            }
+	            // Fallback: Find latest app-* folder
+	            if (Directory.Exists(velopackDir))
+	            {
+	                var appDirs = Directory.GetDirectories(velopackDir, "app-*");
+	                if (appDirs.Length == 0)
+	                {
+	                    LogDebug("No Velopack app-* directories found.");
+	                }
+	                foreach (var dir in appDirs.OrderByDescending(d => d))
+	                {
+	                    string launcherPath = Path.Combine(dir, "ModelInfoUpdater.Updater.exe");
+	                    if (File.Exists(launcherPath))
+	                    {
+	                        LogDebug($"Launcher found in Velopack app-* directory: {launcherPath}");
+	                        return launcherPath;
+	                    }
+	                    else
+	                    {
+	                        LogDebug($"No launcher in Velopack app-* directory: {dir}");
+	                    }
+	                }
+	            }
+	            else
+	            {
+	                LogDebug($"Velopack directory does not exist: {velopackDir}");
+	            }
 
-            // Fallback: Next to add-in DLL (for development/manual install)
-            string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            string localLauncher = Path.Combine(assemblyDir, "ModelInfoUpdater.Updater.exe");
-            if (File.Exists(localLauncher))
-                return localLauncher;
+	            // 2. Revit add-ins directories under %AppData%\\Autodesk\\Revit\\Addins\\<year>
+	            string userAppData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+	            string revitRoot = Path.Combine(userAppData, "Autodesk", "Revit", "Addins");
+	            if (Directory.Exists(revitRoot))
+	            {
+	                foreach (var year in new[] { "2026", "2025", "2024" })
+	                {
+	                    string addinDir = Path.Combine(revitRoot, year);
+	                    string launcherPath = Path.Combine(addinDir, "ModelInfoUpdater.Updater.exe");
+	                    if (File.Exists(launcherPath))
+	                    {
+	                        LogDebug($"Launcher found in Revit add-ins folder for {year}: {launcherPath}");
+	                        return launcherPath;
+	                    }
+	                    else
+	                    {
+	                        LogDebug($"No launcher in Revit add-ins folder for {year}: {addinDir}");
+	                    }
+	                }
+	            }
+	            else
+	            {
+	                LogDebug($"Revit add-ins root directory does not exist: {revitRoot}");
+	            }
 
-            return null;
+	            // 3. Fallback: Next to add-in DLL (for development/manual install)
+	            string assemblyDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? string.Empty;
+	            string localLauncher = Path.Combine(assemblyDir, "ModelInfoUpdater.Updater.exe");
+	            if (File.Exists(localLauncher))
+	            {
+	                LogDebug($"Launcher found next to executing assembly: {localLauncher}");
+	                return localLauncher;
+	            }
+	            else
+	            {
+	                LogDebug($"No launcher next to executing assembly. AssemblyDir='{assemblyDir}'");
+	            }
+
+	            LogDebug("Launcher not found in any known location.");
+	            return null;
         }
 
         /// <summary>
@@ -338,8 +405,10 @@ namespace ModelInfoUpdater.Services
         /// The Launcher downloads the update, then deploys files to Revit add-in folder.
         /// </summary>
         /// <param name="silent">If true, updater runs without console output.</param>
+        /// <param name="revitPid">If provided, updater will wait for this Revit process to close.</param>
+        /// <param name="revitExePath">If provided, updater will restart Revit at this path after update.</param>
         /// <returns>True if launcher was started successfully.</returns>
-        public bool LaunchUpdater(bool silent = false)
+        public bool LaunchUpdater(bool silent = false, int? revitPid = null, string? revitExePath = null)
         {
             try
             {
@@ -347,14 +416,26 @@ namespace ModelInfoUpdater.Services
 
                 if (launcherPath == null)
                 {
-                    _lastError = "Launcher not found. Please run the installer first.";
-                    LogDebug(_lastError);
+	                    _lastError =
+	                        "ModelInfoUpdater.Updater.exe could not be found. " +
+	                        "Please run the installer or ensure the updater exists in the Velopack folder or Revit Addins folder.";
+	                    FileLogger.Log(LogLevel.Error, "VelopackUpdateService", _lastError);
                     return false;
                 }
 
                 // Build arguments
                 string args = "--update";
                 if (silent) args += " --silent";
+
+                // Add Revit restart parameters if provided
+                if (revitPid.HasValue)
+                {
+                    args += $" --revit-pid {revitPid.Value}";
+                }
+                if (!string.IsNullOrEmpty(revitExePath))
+                {
+                    args += $" --revit-exe \"{revitExePath}\"";
+                }
 
                 // Launch the updater
                 var startInfo = new ProcessStartInfo
@@ -365,14 +446,15 @@ namespace ModelInfoUpdater.Services
                     WindowStyle = silent ? ProcessWindowStyle.Hidden : ProcessWindowStyle.Normal
                 };
 
-                Process.Start(startInfo);
-                LogDebug($"Launched updater: {launcherPath} {args}");
+	                LogDebug($"Starting updater process. FileName='{startInfo.FileName}', Arguments='{startInfo.Arguments}', Silent={silent}");
+	                Process.Start(startInfo);
+	                LogDebug("Updater process was started successfully.");
                 return true;
             }
             catch (Exception ex)
             {
                 _lastError = $"Failed to launch updater: {ex.Message}";
-                LogDebug(_lastError);
+	                FileLogger.LogException("VelopackUpdateService", "LaunchUpdater", ex);
                 return false;
             }
         }

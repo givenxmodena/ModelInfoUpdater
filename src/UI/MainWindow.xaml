@@ -1,7 +1,7 @@
 <Window x:Class="ModelInfoUpdater.UI.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Model Info Updater v1.2.0"
+        Title="Model Info Updater v1.3.1"
         Height="520"
         Width="500"
         WindowStartupLocation="CenterOwner"
@@ -39,7 +39,45 @@
             <Setter Property="Margin" Value="0,4,0,2"/>
         </Style>
 
-        <!-- Style for TextBoxes -->
+        <!-- Style for TextBoxes with Watermark -->
+        <Style x:Key="WatermarkTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="BorderBrush" Value="#0078D4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid>
+                                <ScrollViewer x:Name="PART_ContentHost"
+                                              Margin="{TemplateBinding Padding}"/>
+                                <TextBlock x:Name="WatermarkText"
+                                           Text="{TemplateBinding Tag}"
+                                           Margin="{TemplateBinding Padding}"
+                                           Foreground="#999999"
+                                           FontStyle="Italic"
+                                           IsHitTestVisible="False"
+                                           Visibility="Collapsed"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <MultiTrigger>
+                                <MultiTrigger.Conditions>
+                                    <Condition Property="Text" Value=""/>
+                                    <Condition Property="IsFocused" Value="False"/>
+                                </MultiTrigger.Conditions>
+                                <Setter TargetName="WatermarkText" Property="Visibility" Value="Visible"/>
+                            </MultiTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Default Style for TextBoxes -->
         <Style TargetType="TextBox">
             <Setter Property="Padding" Value="8,6"/>
             <Setter Property="BorderBrush" Value="#0078D4"/>
@@ -84,7 +122,12 @@
                 <TextBlock Text="{Binding CurrentProjectName}" Style="{StaticResource CurrentValueStyle}"/>
                 <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
                 <TextBox Text="{Binding NewProjectName, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource WatermarkTextBoxStyle}"
+                         Tag="Enter new project name"
                          ToolTip="Enter the new project name"/>
+
+                <!-- Separator -->
+                <Separator Margin="0,12,0,4" Background="#D0D0D0"/>
 
                 <!-- Project Number -->
                 <Label Content="Project Number" Style="{StaticResource FieldLabelStyle}"/>
@@ -92,7 +135,12 @@
                 <TextBlock Text="{Binding CurrentProjectNumber}" Style="{StaticResource CurrentValueStyle}"/>
                 <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
                 <TextBox Text="{Binding NewProjectNumber, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource WatermarkTextBoxStyle}"
+                         Tag="Enter new project number"
                          ToolTip="Enter the new project number"/>
+
+                <!-- Separator -->
+                <Separator Margin="0,12,0,4" Background="#D0D0D0"/>
 
                 <!-- Client Name -->
                 <Label Content="Client Name" Style="{StaticResource FieldLabelStyle}"/>
@@ -100,7 +148,12 @@
                 <TextBlock Text="{Binding CurrentClientName}" Style="{StaticResource CurrentValueStyle}"/>
                 <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
                 <TextBox Text="{Binding NewClientName, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource WatermarkTextBoxStyle}"
+                         Tag="Enter new client name"
                          ToolTip="Enter the new client name"/>
+
+                <!-- Separator -->
+                <Separator Margin="0,12,0,4" Background="#D0D0D0"/>
 
                 <!-- Project Status -->
                 <Label Content="Project Status" Style="{StaticResource FieldLabelStyle}"/>
@@ -108,6 +161,8 @@
                 <TextBlock Text="{Binding CurrentProjectStatus}" Style="{StaticResource CurrentValueStyle}"/>
                 <TextBlock Text="Update to:" Style="{StaticResource NewLabelStyle}"/>
                 <TextBox Text="{Binding NewProjectStatus, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource WatermarkTextBoxStyle}"
+                         Tag="Enter new project status"
                          ToolTip="Enter the new project status (e.g., In Progress, Complete, On Hold)"/>
             </StackPanel>
         </ScrollViewer>

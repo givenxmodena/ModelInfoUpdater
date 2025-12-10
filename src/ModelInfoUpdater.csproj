@@ -53,16 +53,24 @@
     </Reference>
   </ItemGroup>
 
-  <!-- WPF References for .NET Framework 4.8 -->
-  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
-    <Reference Include="PresentationCore" />
-    <Reference Include="PresentationFramework" />
-    <Reference Include="WindowsBase" />
-    <Reference Include="System.Xaml" />
-  </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Velopack" Version="0.0.1298" />
-  </ItemGroup>
+	  <!-- WPF References for .NET Framework 4.8 -->
+	  <ItemGroup Condition="'$(TargetFramework)' == 'net48'">
+	    <Reference Include="PresentationCore" />
+	    <Reference Include="PresentationFramework" />
+	    <Reference Include="WindowsBase" />
+	    <Reference Include="System.Xaml" />
+	  </ItemGroup>
+
+	  <!-- Exclude the Updater subproject files from this project.
+	       They are compiled by src/Updater/ModelInfoUpdater.Updater.csproj. -->
+	  <ItemGroup>
+	    <Compile Remove="Updater\**\*.cs" />
+	    <Page Remove="Updater\**\*.xaml" />
+	  </ItemGroup>
+
+	  <ItemGroup>
+	    <PackageReference Include="Velopack" Version="0.0.1298" />
+	  </ItemGroup>
 
 </Project>
 

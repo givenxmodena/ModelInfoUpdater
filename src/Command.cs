@@ -3,6 +3,7 @@ using Autodesk.Revit.Attributes;
 using Autodesk.Revit.DB;
 using Autodesk.Revit.UI;
 using ModelInfoUpdater.UI;
+using ModelInfoUpdater.Logging;
 
 namespace ModelInfoUpdater
 {
@@ -41,8 +42,9 @@ namespace ModelInfoUpdater
                 // Get the active UI application and document
                 UIApplication uiApp = commandData.Application;
                 UIDocument uiDoc = uiApp.ActiveUIDocument;
+	                FileLogger.Log(LogLevel.Info, "Command", "Execute invoked from Revit ribbon.");
 
-                // Validate document availability
+	                // Validate document availability
                 if (uiDoc == null || uiDoc.Document == null)
                 {
                     TaskDialog.Show("Model Info Updater",
@@ -50,11 +52,14 @@ namespace ModelInfoUpdater
                     return Result.Cancelled;
                 }
 
-                Document doc = uiDoc.Document;
+	                Document doc = uiDoc.Document;
+	                FileLogger.Log(LogLevel.Debug, "Command",
+	                    $"Active document: {doc.Title}, IsModified={doc.IsModified}");
 
                 // Check for updates and notify user (non-blocking, runs in background)
                 // Fire-and-forget - we don't want to block the UI
-                _ = App.ShowUpdateNotificationIfAvailableAsync();
+                // Pass UIApplication for seamless auto-restart capability
+                _ = App.ShowUpdateNotificationIfAvailableAsync(uiApp);
 
                 // Create the WPF window - dependency injection happens in MainWindow constructor
                 // MainWindow creates its ViewModel and Service internally
@@ -76,6 +81,7 @@ namespace ModelInfoUpdater
             }
             catch (Exception ex)
             {
+	                FileLogger.LogException("Command", "Execute", ex);
                 message = $"An error occurred: {ex.Message}";
                 TaskDialog.Show("Model Info Updater Error", message);
                 return Result.Failed;

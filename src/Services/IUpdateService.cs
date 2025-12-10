@@ -57,8 +57,10 @@ namespace ModelInfoUpdater.Services
         /// For Revit add-ins, this is the recommended way to apply updates.
         /// </summary>
         /// <param name="silent">If true, updater runs without user interaction.</param>
+        /// <param name="revitPid">If provided, updater will wait for this Revit process to close.</param>
+        /// <param name="revitExePath">If provided, updater will restart Revit at this path after update.</param>
         /// <returns>True if updater was launched successfully.</returns>
-        bool LaunchUpdater(bool silent = true);
+        bool LaunchUpdater(bool silent = true, int? revitPid = null, string? revitExePath = null);
 
         /// <summary>
         /// Applies the downloaded update.
