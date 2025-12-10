@@ -132,3 +132,9 @@ github-token*
 # PowerShell secure string exports
 *.securestring
 
+# ===========================================
+# Local documentation and helper scripts (not tracked)
+# ===========================================
+*.md
+scripts/
+
