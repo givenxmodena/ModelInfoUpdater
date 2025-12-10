@@ -21,6 +21,13 @@ namespace ModelInfoUpdater.UI
         {
             InitializeComponent();
 
+            // Set dynamic window title based on the current assembly version
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            if (version != null)
+            {
+                Title = $"Model Info Updater v{version.Major}.{version.Minor}.{version.Build}";
+            }
+
             // Create service (could be injected via DI container in larger applications)
             IProjectInfoService projectInfoService = new ProjectInfoService(document);
 

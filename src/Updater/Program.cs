@@ -44,54 +44,68 @@ namespace ModelInfoUpdater.Updater;
 	        { "2026", "net8.0-windows" }
 	    };
 
-	    /// <summary>
-	    /// Entry point. In silent mode we run the update flow headlessly; otherwise
-	    /// we spin up a WPF window that shows status and progress instead of a console.
-	    /// </summary>
-	    [STAThread]
-	    public static int Main(string[] args)
-	    {
-	        bool silent = args.Contains("--silent");
-	        bool updateMode = args.Contains("--update");
-	
-	        // Parse Revit auto-restart parameters
-	        int? revitPid = GetArgInt(args, "--revit-pid");
-	        string? revitExePath = GetArgString(args, "--revit-exe");
-	
-	        // Initialize centralized file logging
-	        string argsJoined = string.Join(" ", args ?? Array.Empty<string>());
-	        string assemblyVersion = GetAssemblyVersion();
-	        FileLogger.Initialize("ModelInfoUpdater.Updater");
-	        FileLogger.LogEnvironment("UpdaterStartup", assemblyVersion,
-	            $"Args=\"{argsJoined}\", RevitPid={revitPid?.ToString() ?? "null"}, RevitExePath=\"{revitExePath ?? string.Empty}\"");
-	        FileLogger.Log(LogLevel.Info, "UpdaterStartup",
-	            $"Starting updater. updateMode={updateMode}, silent={silent}");
-	
-	        try
-	        {
-	            // Initialize Velopack - handles pending updates from previous runs
-	            VelopackApp.Build().Run();
-	
-	            if (silent)
-	            {
-	                // Headless flow used when launched with --silent
-	                return RunSilentAsync(updateMode, revitPid, revitExePath).GetAwaiter().GetResult();
-	            }
-	
-	            // GUI flow: show WPF window that mirrors the main add-in look & feel
-	            var app = new System.Windows.Application();
-	            var window = new UpdateWindow(updateMode, revitPid, revitExePath);
-	            app.Run(window);
-	
-	            return window.ExitCode;
-	        }
-	        catch (Exception ex)
-	        {
-	            FileLogger.LogException("UpdaterMain", "Main", ex);
-	            LogMessage($"Error: {ex.Message}", silent: true, LogLevel.Error);
-	            return 1;
-	        }
-	    }
+        /// <summary>
+        /// Entry point. In silent mode we run the update flow headlessly; otherwise
+        /// we spin up a WPF window that shows status and progress instead of a console.
+        ///
+        /// NOTE:
+        /// - VelopackApp.Build().Run() is best-effort. If the app is not running from a
+        ///   Velopack-managed install (e.g. during local debugging), we still want the
+        ///   updater UI to appear instead of exiting immediately.
+        /// </summary>
+        [STAThread]
+        public static int Main(string[] args)
+        {
+            bool silent = args.Contains("--silent");
+            bool updateMode = args.Contains("--update");
+
+            // Parse Revit auto-restart parameters
+            int? revitPid = GetArgInt(args, "--revit-pid");
+            string? revitExePath = GetArgString(args, "--revit-exe");
+
+            // Initialize centralized file logging
+            string argsJoined = string.Join(" ", args ?? Array.Empty<string>());
+            string assemblyVersion = GetAssemblyVersion();
+            FileLogger.Initialize("ModelInfoUpdater.Updater");
+            FileLogger.LogEnvironment("UpdaterStartup", assemblyVersion,
+                $"Args=\"{argsJoined}\", RevitPid={revitPid?.ToString() ?? "null"}, RevitExePath=\"{revitExePath ?? string.Empty}\"");
+            FileLogger.Log(LogLevel.Info, "UpdaterStartup",
+                $"Starting updater. updateMode={updateMode}, silent={silent}");
+
+            try
+            {
+                // Initialize Velopack if available. If this fails (for example when
+                // running from a plain build output folder instead of a Velopack
+                // installation), we log and continue so the WPF UI can still run.
+                try
+                {
+                    VelopackApp.Build().Run();
+                }
+                catch (Exception veloEx)
+                {
+                    FileLogger.LogException("UpdaterStartup", "VelopackBootstrap", veloEx);
+                }
+
+                if (silent)
+                {
+                    // Headless flow used when launched with --silent
+                    return RunSilentAsync(updateMode, revitPid, revitExePath).GetAwaiter().GetResult();
+                }
+
+                // GUI flow: show WPF window that mirrors the main add-in look & feel
+                var app = new System.Windows.Application();
+                var window = new UpdateWindow(updateMode, revitPid, revitExePath);
+                app.Run(window);
+
+                return window.ExitCode;
+            }
+            catch (Exception ex)
+            {
+                FileLogger.LogException("UpdaterMain", "Main", ex);
+                LogMessage($"Error: {ex.Message}", silent: true, LogLevel.Error);
+                return 1;
+            }
+        }
 
 	    /// <summary>
 	    /// Original console-based flow, now used only for fully silent runs.

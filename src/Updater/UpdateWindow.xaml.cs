@@ -17,9 +17,13 @@ namespace ModelInfoUpdater.Updater
         {
             InitializeComponent();
 
+            // In this application the window is run as the main WPF window via
+            // Application.Run(window), not as a modal dialog (ShowDialog). Using
+            // DialogResult in that scenario throws InvalidOperationException.
+            // We simply close the window via the provided callback and let the
+            // view model communicate the final ExitCode back to Program.Main.
             _viewModel = new UpdateViewModel(updateMode, revitPid, revitExePath, () =>
             {
-                DialogResult = true;
                 Close();
             });
 

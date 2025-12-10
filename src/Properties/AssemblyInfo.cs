@@ -17,8 +17,8 @@ using System.Windows;
 [assembly: ComVisible(false)]
 
 // Version information for an assembly
-[assembly: AssemblyVersion("1.4.0.0")]
-[assembly: AssemblyFileVersion("1.4.0.0")]
+[assembly: AssemblyVersion("1.5.2.0")]
+[assembly: AssemblyFileVersion("1.5.2.0")]
 
 // WPF Theme information
 [assembly: ThemeInfo(

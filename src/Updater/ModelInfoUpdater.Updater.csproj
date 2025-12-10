@@ -79,6 +79,8 @@
     <ItemGroup>
       <Net8FilesToCopy Include="$(Net8SourceDir)ModelInfoUpdater.dll" />
       <Net8FilesToCopy Include="$(Net8SourceDir)ModelInfoUpdater.deps.json" />
+      <Net8FilesToCopy Include="$(Net8SourceDir)Velopack.dll" />
+      <Net8FilesToCopy Include="$(Net8SourceDir)NuGet.Versioning.dll" />
     </ItemGroup>
 
     <!-- Copy .NET Framework 4.8 files -->

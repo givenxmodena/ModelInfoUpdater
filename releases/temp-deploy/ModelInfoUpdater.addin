@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <!--
+    ModelInfoUpdater Add-in Manifest
+    
+    This file tells Revit how to load the ModelInfoUpdater add-in.
+    
+    INSTALLATION INSTRUCTIONS:
+    ==========================
+    
+    For Revit 2026:
+    1. Copy this file to: %APPDATA%\Autodesk\Revit\Addins\2026\
+    2. Copy the DLL from build-output\net8.0-windows\ to your preferred location
+    3. Update the <Assembly> path below to point to your DLL location
+    
+    For Revit 2024:
+    1. Copy this file to: %APPDATA%\Autodesk\Revit\Addins\2024\
+    2. Copy the DLL from build-output\net48\ to your preferred location
+    3. Update the <Assembly> path below to point to your DLL location
+    
+    Alternatively, you can place the DLL in the same folder as this .addin file
+    and use a relative path or just the filename.
+  -->
+  
+  <AddIn Type="Application">
+    <!-- Unique identifier for this add-in -->
+    <AddInId>A1B2C3D4-E5F6-7890-ABCD-EF1234567890</AddInId>
+    
+    <!-- 
+      Path to the compiled DLL
+      Update this path to match your installation location.
+      Examples:
+        - Relative: ModelInfoUpdater.dll
+        - Absolute: C:\RevitAddins\ModelInfoUpdater\ModelInfoUpdater.dll
+    -->
+    <Assembly>ModelInfoUpdater.dll</Assembly>
+    
+    <!-- Full namespace and class name of the IExternalApplication class -->
+    <FullClassName>ModelInfoUpdater.App</FullClassName>
+    
+    <!-- Display name shown in Revit's Add-Ins manager -->
+    <Name>Model Info Updater</Name>
+    
+    <!-- Vendor ID (your company or personal identifier) -->
+    <VendorId>DEVELOPER</VendorId>
+    
+    <!-- Vendor description -->
+    <VendorDescription>Model Info Updater Add-in</VendorDescription>
+  </AddIn>
+</RevitAddIns>
+

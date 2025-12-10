@@ -63,7 +63,6 @@ if (-not (Test-Path $ReleasesDir)) {
 Write-Host "`n[3/5] Packaging with Velopack (net8.0-windows)..." -ForegroundColor Yellow
 
 $Net8OutputDir = Join-Path $BuildOutputDir "net8.0-windows"
-$VelopackOutputDir = Join-Path $ReleasesDir "velopack"
 
 # Check if vpk is installed
 $vpkPath = Get-Command vpk -ErrorAction SilentlyContinue
@@ -73,17 +72,18 @@ if (-not $vpkPath) {
 }
 
 # Create Velopack package
+# The updater exe is the main executable that Velopack manages
+# It contains the add-in DLLs in framework-specific subfolders (net48/, net8.0-windows/)
 vpk pack `
     --packId $AppId `
     --packVersion $Version `
     --packDir $Net8OutputDir `
-    --mainExe "ModelInfoUpdater.dll" `
-    --outputDir $VelopackOutputDir `
+    --mainExe "ModelInfoUpdater.Updater.exe" `
+    --outputDir $ReleasesDir `
     --framework "net8.0-x64-desktop"
 
-if ($LASTEXITCODE -ne 0) { 
-    Write-Warning "Velopack packaging failed. This is expected if mainExe is a DLL."
-    Write-Host "Continuing with manual packaging..." -ForegroundColor Yellow
+if ($LASTEXITCODE -ne 0) {
+    throw "Velopack packaging failed. Check that ModelInfoUpdater.Updater.exe exists in $Net8OutputDir"
 }
 
 # Step 4: Create ZIP packages for manual distribution
@@ -115,21 +115,32 @@ Write-Host "Created: $Zip2024" -ForegroundColor Green
 # Step 5: Publish to GitHub (optional)
 if ($PublishToGitHub) {
     Write-Host "`n[5/5] Publishing to GitHub Releases..." -ForegroundColor Yellow
-    
+
     if (-not $GitHubToken) {
         throw "GitHub token required. Set GITHUB_TOKEN environment variable or use -GitHubToken parameter."
     }
-    
+
+    # Collect Velopack artifacts
+    $FullNupkg = Join-Path $ReleasesDir "ModelInfoUpdater-$Version-full.nupkg"
+    $DeltaNupkg = Join-Path $ReleasesDir "ModelInfoUpdater-$Version-delta.nupkg"
+    $ReleasesFile = Join-Path $ReleasesDir "RELEASES"
+
+    $artifactsToUpload = @($Zip2026, $Zip2024)
+
+    # Add Velopack packages if they exist
+    if (Test-Path $FullNupkg) { $artifactsToUpload += $FullNupkg }
+    if (Test-Path $DeltaNupkg) { $artifactsToUpload += $DeltaNupkg }
+    if (Test-Path $ReleasesFile) { $artifactsToUpload += $ReleasesFile }
+
     # Create release using GitHub CLI (gh) if available
     $ghPath = Get-Command gh -ErrorAction SilentlyContinue
     if ($ghPath) {
         gh release create "v$Version" `
-            $Zip2026 `
-            $Zip2024 `
+            $artifactsToUpload `
             --repo $GitHubRepo `
             --title "v$Version" `
             --notes "Release v$Version of Model Info Updater"
-        
+
         Write-Host "Published to GitHub!" -ForegroundColor Green
     }
     else {
@@ -143,6 +154,46 @@ else {
 
 Write-Host "`n========================================" -ForegroundColor Cyan
 Write-Host "Release $Version build complete!" -ForegroundColor Green
-Write-Host "Output directory: $ReleasesDir" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+
+Write-Host "`nCreated artifacts:" -ForegroundColor Yellow
+
+# List Velopack packages
+$FullNupkg = Join-Path $ReleasesDir "ModelInfoUpdater-$Version-full.nupkg"
+$DeltaNupkg = Join-Path $ReleasesDir "ModelInfoUpdater-$Version-delta.nupkg"
+$ReleasesFile = Join-Path $ReleasesDir "RELEASES"
+
+if (Test-Path $FullNupkg) {
+    Write-Host "  ✓ $FullNupkg" -ForegroundColor Green
+} else {
+    Write-Host "  ✗ $FullNupkg (missing)" -ForegroundColor Red
+}
+
+if (Test-Path $DeltaNupkg) {
+    Write-Host "  ✓ $DeltaNupkg" -ForegroundColor Green
+} else {
+    Write-Host "  ℹ $DeltaNupkg (not created - expected for first release)" -ForegroundColor Gray
+}
+
+if (Test-Path $ReleasesFile) {
+    Write-Host "  ✓ $ReleasesFile" -ForegroundColor Green
+} else {
+    Write-Host "  ✗ $ReleasesFile (missing)" -ForegroundColor Red
+}
+
+# List convenience ZIPs
+if (Test-Path $Zip2026) {
+    Write-Host "  ✓ $Zip2026" -ForegroundColor Green
+} else {
+    Write-Host "  ✗ $Zip2026 (missing)" -ForegroundColor Red
+}
+
+if (Test-Path $Zip2024) {
+    Write-Host "  ✓ $Zip2024" -ForegroundColor Green
+} else {
+    Write-Host "  ✗ $Zip2024 (missing)" -ForegroundColor Red
+}
+
+Write-Host "`nOutput directory: $ReleasesDir" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 

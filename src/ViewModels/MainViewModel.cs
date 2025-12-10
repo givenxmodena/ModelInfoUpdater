@@ -70,28 +70,52 @@ namespace ModelInfoUpdater.ViewModels
         public string NewProjectName
         {
             get => _newProjectName;
-            set => SetProperty(ref _newProjectName, value);
+            set
+            {
+                if (SetProperty(ref _newProjectName, value))
+                {
+                    ((RelayCommand)SaveCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         /// <summary>Gets or sets the new project number.</summary>
         public string NewProjectNumber
         {
             get => _newProjectNumber;
-            set => SetProperty(ref _newProjectNumber, value);
+            set
+            {
+                if (SetProperty(ref _newProjectNumber, value))
+                {
+                    ((RelayCommand)SaveCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         /// <summary>Gets or sets the new client name.</summary>
         public string NewClientName
         {
             get => _newClientName;
-            set => SetProperty(ref _newClientName, value);
+            set
+            {
+                if (SetProperty(ref _newClientName, value))
+                {
+                    ((RelayCommand)SaveCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         /// <summary>Gets or sets the new project status.</summary>
         public string NewProjectStatus
         {
             get => _newProjectStatus;
-            set => SetProperty(ref _newProjectStatus, value);
+            set
+            {
+                if (SetProperty(ref _newProjectStatus, value))
+                {
+                    ((RelayCommand)SaveCommand).RaiseCanExecuteChanged();
+                }
+            }
         }
 
         #endregion
@@ -164,11 +188,11 @@ namespace ModelInfoUpdater.ViewModels
                     CurrentClientName = model.ClientName;
                     CurrentProjectStatus = model.ProjectStatus;
 
-                    // Also populate new (editable) values with current values
-                    NewProjectName = model.ProjectName;
-                    NewProjectNumber = model.ProjectNumber;
-                    NewClientName = model.ClientName;
-                    NewProjectStatus = model.ProjectStatus;
+                    // Clear the editable fields to show placeholders
+                    NewProjectName = string.Empty;
+                    NewProjectNumber = string.Empty;
+                    NewClientName = string.Empty;
+                    NewProjectStatus = string.Empty;
 
                     SetStatus("Values loaded successfully.", false);
                 }
@@ -185,29 +209,34 @@ namespace ModelInfoUpdater.ViewModels
 
         private bool CanExecuteSave(object parameter)
         {
-            return _projectInfoService.IsDocumentAvailable();
+            // Can save if document is available and at least one field has been modified
+            return _projectInfoService.IsDocumentAvailable() &&
+                   (!string.IsNullOrWhiteSpace(NewProjectName) ||
+                    !string.IsNullOrWhiteSpace(NewProjectNumber) ||
+                    !string.IsNullOrWhiteSpace(NewClientName) ||
+                    !string.IsNullOrWhiteSpace(NewProjectStatus));
         }
 
         private void ExecuteSave(object parameter)
         {
             try
             {
-                // Use the new (editable) values for saving
+                // Use the new (editable) values for saving, but keep current values if fields are empty
                 var model = new ProjectInfoModel
                 {
-                    ProjectName = NewProjectName,
-                    ProjectNumber = NewProjectNumber,
-                    ClientName = NewClientName,
-                    ProjectStatus = NewProjectStatus
+                    ProjectName = string.IsNullOrWhiteSpace(NewProjectName) ? CurrentProjectName : NewProjectName,
+                    ProjectNumber = string.IsNullOrWhiteSpace(NewProjectNumber) ? CurrentProjectNumber : NewProjectNumber,
+                    ClientName = string.IsNullOrWhiteSpace(NewClientName) ? CurrentClientName : NewClientName,
+                    ProjectStatus = string.IsNullOrWhiteSpace(NewProjectStatus) ? CurrentProjectStatus : NewProjectStatus
                 };
 
                 if (_projectInfoService.SaveProjectInfo(model))
                 {
                     // Update current values to reflect the saved changes
-                    CurrentProjectName = NewProjectName;
-                    CurrentProjectNumber = NewProjectNumber;
-                    CurrentClientName = NewClientName;
-                    CurrentProjectStatus = NewProjectStatus;
+                    CurrentProjectName = model.ProjectName;
+                    CurrentProjectNumber = model.ProjectNumber;
+                    CurrentClientName = model.ClientName;
+                    CurrentProjectStatus = model.ProjectStatus;
 
                     MessageBox.Show("Project information updated successfully!",
                         "Success", MessageBoxButton.OK, MessageBoxImage.Information);

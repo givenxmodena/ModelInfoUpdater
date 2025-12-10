@@ -307,11 +307,6 @@ namespace ModelInfoUpdater
                 // Launch the updater with Revit restart parameters
                 if (UpdateService.LaunchUpdater(silent: false, revitPid: revitPid, revitExePath: revitExePath))
                 {
-                    TaskDialog.Show("Updating...",
-                        "The update is downloading.\n\n" +
-                        "Revit will close automatically when the download completes.\n" +
-                        "Please save any work now if needed.");
-
                     // Request Revit to close gracefully
                     // Note: This will trigger save prompts if there's unsaved work
                     try
