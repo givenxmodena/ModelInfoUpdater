@@ -34,7 +34,32 @@ namespace ModelInfoUpdater.Services
         /// <summary>
         /// Gets whether an update is currently available.
         /// </summary>
-        public bool IsUpdateAvailable => _updateInfo?.TargetFullRelease != null || _availableVersionFromHttp != null;
+        public bool IsUpdateAvailable
+        {
+            get
+            {
+                // Check Velopack update info
+                if (_updateInfo?.TargetFullRelease != null)
+                {
+                    var latestVersion = _updateInfo.TargetFullRelease.Version.ToString();
+                    if (IsNewerVersion(latestVersion, CurrentVersion))
+                    {
+                        return true;
+                    }
+                }
+
+                // Check HTTP fallback version
+                if (_availableVersionFromHttp != null)
+                {
+                    if (IsNewerVersion(_availableVersionFromHttp, CurrentVersion))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
 
         /// <summary>
         /// Gets whether the update has been downloaded and is ready to apply.
